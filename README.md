@@ -1,3 +1,4 @@
+![demo](https://github.com/user-attachments/assets/9f14a577-11fe-47a5-9277-4d77aa123c53)
 ---
 
 # Audio Visualization
