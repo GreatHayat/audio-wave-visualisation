@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audio Visualization</title>
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #fff;
+        margin: 0;
+      }
+
+      #visualizer {
+        background-color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="visualizer" width="1000" height="800"></canvas>
+
+    <script>
+      const canvas = document.getElementById("visualizer");
+      const ctx = canvas.getContext("2d");
+
+      const barWidth = 3; // Width of each bar
+      const barGap = 5; // Gap between bars
+      const maxBars = 100; // Number of bars on each side of the center
+      const maxBarHeight = 200; // Increased height of the bars
+
+      function drawBar(x, y, height) {
+        const gradient = ctx.createLinearGradient(x, y - height, x, y + height);
+        gradient.addColorStop(0, "#2FA5F6");
+        gradient.addColorStop(1, "#4318FF");
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.moveTo(x, y - height / 2 + 2);
+        ctx.lineTo(x + barWidth - 2, y - height / 2 + 2);
+        ctx.quadraticCurveTo(
+          x + barWidth,
+          y - height / 2 + 2,
+          x + barWidth,
+          y - height / 2 + 4
+        );
+        ctx.lineTo(x + barWidth, y + height / 2 - 4);
+        ctx.quadraticCurveTo(
+          x + barWidth,
+          y + height / 2,
+          x + barWidth - 2,
+          y + height / 2
+        );
+        ctx.lineTo(x + 2, y + height / 2);
+        ctx.quadraticCurveTo(x, y + height / 2, x, y + height / 2 - 4);
+        ctx.lineTo(x, y - height / 2 + 4);
+        ctx.quadraticCurveTo(x, y - height / 2 + 2, x + 2, y - height / 2 + 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          const audioContext = new (window.AudioContext ||
+            window.webkitAudioContext)();
+          const analyser = audioContext.createAnalyser();
+          const microphone = audioContext.createMediaStreamSource(stream);
+          const scriptProcessor = audioContext.createScriptProcessor(
+            2048,
+            1,
+            1
+          );
+
+          analyser.smoothingTimeConstant = 0.8;
+          analyser.fftSize = 1024;
+
+          microphone.connect(analyser);
+          analyser.connect(scriptProcessor);
+          scriptProcessor.connect(audioContext.destination);
+
+          scriptProcessor.onaudioprocess = () => {
+            const array = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(array);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            let isSpeaking = false;
+
+            for (let i = 0; i < maxBars; i++) {
+              const height = (array[i] / 2) * (maxBarHeight / 128); // Increase height scaling factor
+              if (height > 1) {
+                isSpeaking = true;
+              }
+              const xPos = centerX + (i - maxBars / 2) * (barWidth + barGap);
+
+              drawBar(xPos, centerY, height);
+              drawBar(xPos, centerY, -height);
+            }
+
+            if (!isSpeaking) {
+              // Animation when mic is on but user is not speaking
+              const animationHeight = 10 + Math.sin(Date.now() / 200) * 5;
+              for (let i = 0; i < maxBars; i++) {
+                const xPos = centerX + (i - maxBars / 2) * (barWidth + barGap);
+                drawBar(xPos, centerY, animationHeight);
+              }
+            }
+          };
+        })
+        .catch((err) => console.error(err));
+    </script>
+  </body>
+</html>
